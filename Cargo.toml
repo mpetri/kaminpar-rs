@@ -1,0 +1,20 @@
+[package]
+authors = ["Matthias Petri <Matthias.Petri@gmail.com>"]
+name = "kaminpar"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+categories = ["algorithms", "science"]
+keywords = ["graph", "clustering", "partitioning"]
+readme = "README.md"
+description = "Rust wrapper around KaMinPar which is a shared-memory parallel tool to heuristically solve the graph partitioning problem."
+repository = "https://github.com/mpetri/kaminpar-rs/"
+links = "kaminpar"
+
+[dependencies]
+libc = { version = "0.2.43", optional = true }
+cxx = "1.0"
+
+[build-dependencies]
+cmake = "0.1"
+cxx-build = "1.0"
