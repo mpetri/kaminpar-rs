@@ -1,7 +1,7 @@
 [package]
 authors = ["Matthias Petri <Matthias.Petri@gmail.com>"]
 name = "kaminpar"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 categories = ["algorithms", "science"]
@@ -14,6 +14,7 @@ links = "kaminpar"
 [dependencies]
 libc = { version = "0.2.43", optional = true }
 cxx = "1.0"
+petgraph = "0.6.2"
 
 [build-dependencies]
 cmake = "0.1"

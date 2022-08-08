@@ -1,6 +1,13 @@
 #![warn(clippy::pedantic)]
 
+use petgraph::visit::EdgeRef;
+use petgraph::Graph;
+
 const DEFAULT_EPSILON: f64 = 0.03;
+
+pub type UndirectedGraph = petgraph::graph::UnGraph<(), ()>;
+pub type UndirectedEdgeWeightedGraph = petgraph::graph::UnGraph<(), i64>;
+pub type UndirectedWeightedGraph = petgraph::graph::UnGraph<i32, i64>;
 
 #[cxx::bridge]
 mod ffi {
@@ -66,12 +73,9 @@ impl PartitionerBuilder {
     }
 
     #[must_use]
-    pub fn partition(
+    pub fn partition<N, E>(
         self,
-        nodes: Vec<u64>,
-        node_weights: Option<Vec<i32>>,
-        edges: Vec<u32>,
-        edge_weights: Option<Vec<i64>>,
+        graph: Graph<N, E, petgraph::Undirected>,
         num_partitions: u32,
     ) -> Vec<u32> {
         let mut partition_builder = ffi::new_partition_builder();
@@ -85,11 +89,32 @@ impl PartitionerBuilder {
                 .set_threads(num_partitions as i32);
         }
 
-        if let Some(edge_weights) = edge_weights {
+        let mut nodes: Vec<u64> = Vec::with_capacity(graph.node_count() + 1);
+        let mut edges: Vec<u32> = Vec::with_capacity(graph.edge_count() * 2);
+        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count() * 2);
+        let mut node_weights: Vec<i32> = Vec::with_capacity(graph.node_count());
+
+        nodes.push(0);
+        for node in graph.node_indices() {
+            let mut num_edges_for_node = 0;
+            if let Ok(node_weight) = graph.node_weight(node).unwrap().try_into() {
+                node_weights.push(node_weight);
+            }
+            for edge in graph.edges(node) {
+                edges.push((edge.target().index() as i32).try_into().unwrap());
+                if let Ok(edge_weight) = edge.weight().try_into() {
+                    edge_weights.push(edge_weight);
+                }
+                num_edges_for_node += 1;
+            }
+            nodes.push(num_edges_for_node);
+        }
+
+        if !edge_weights.is_empty() {
             partition_builder.pin_mut().set_edge_weights(edge_weights);
         }
 
-        if let Some(node_weights) = node_weights {
+        if !node_weights.is_empty() {
             partition_builder.pin_mut().set_node_weights(node_weights);
         }
 
