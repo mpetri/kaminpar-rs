@@ -55,30 +55,70 @@ The actual C++ code requires:
 
 # Usage
 
-as a library call
+as a library call with a node and edge weighted graph:
 
 ```rust
 fn main() {
-    let nodes: Vec<u64> = vec![0, 2, 5, 7, 9, 12];
-    let node_weights: Vec<i32> = vec![1, 2, 3, 4, 5];
-    let edges: Vec<u32> = vec![1, 4, 0, 2, 4, 1, 3, 2, 4, 0, 1, 3];
-    let edge_weights: Vec<i64> = vec![1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 3, 2];
+    let mut graph = petgraph::graph::UnGraph::<i32, i64>::new_undirected();
+    let a = graph.add_node(5);
+    let b = graph.add_node(1);
+    let c = graph.add_node(1);
+    let d = graph.add_node(3);
+    let e = graph.add_node(3);
+    let f = graph.add_node(4);
+    let g = graph.add_node(3);
+
+    graph.add_edge(a, b, 1);
+    graph.add_edge(a, g, 3);
+    graph.add_edge(b, c, 3);
+    graph.add_edge(b, g, 1);
+    graph.add_edge(c, d, 1);
+    graph.add_edge(d, g, 4);
+    graph.add_edge(d, e, 1);
+    graph.add_edge(e, f, 1);
+    graph.add_edge(e, g, 1);
+    graph.add_edge(f, g, 6);
+
     let num_partitions: u32 = 2;
 
     let partition = kaminpar::PartitionerBuilder::with_epsilon(0.03)
         .seed(123)
         .threads(std::num::NonZeroUsize::new(6).unwrap())
-        .partition(
-            nodes,
-            Some(node_weights),
-            edges,
-            Some(edge_weights),
-            num_partitions,
-        );
+        .partition_weighted(&graph, num_partitions);
 
     println!("{:?}", partition);
 }
+```
 
+or unweighted
+
+```rust
+fn main() {
+    let mut graph = petgraph::graph::UnGraph::<(), ()>::new_undirected();
+    let a = graph.add_node(());
+    let b = graph.add_node(());
+    let c = graph.add_node(());
+    let d = graph.add_node(());
+    let e = graph.add_node(());
+
+    graph.add_edge(a, b, ());
+    graph.add_edge(a, e, ());
+
+    graph.add_edge(b, c, ());
+    graph.add_edge(b, e, ());
+
+    graph.add_edge(c, d, ());
+    graph.add_edge(d, e, ());
+
+    let num_partitions: u32 = 2;
+
+    let partition = kaminpar::PartitionerBuilder::with_epsilon(0.03)
+        .seed(123)
+        .threads(std::num::NonZeroUsize::new(6).unwrap())
+        .partition(&graph, num_partitions);
+
+    println!("{:?}", partition);
+}
 ```
 
 # License

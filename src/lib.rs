@@ -2,12 +2,17 @@
 
 use petgraph::visit::EdgeRef;
 use petgraph::Graph;
+use thiserror::Error;
 
 const DEFAULT_EPSILON: f64 = 0.03;
 
-pub type UndirectedGraph = petgraph::graph::UnGraph<(), ()>;
-pub type UndirectedEdgeWeightedGraph = petgraph::graph::UnGraph<(), i64>;
-pub type UndirectedWeightedGraph = petgraph::graph::UnGraph<i32, i64>;
+#[derive(Error, Debug)]
+pub enum KaminParError {
+    #[error("node weight missing")]
+    NodeWeightMissing,
+    #[error("error converting nodeindex to u32")]
+    NodeIdConversionError(#[from] std::num::TryFromIntError),
+}
 
 #[cxx::bridge]
 mod ffi {
@@ -45,6 +50,9 @@ impl Default for PartitionerBuilder {
 }
 
 impl PartitionerBuilder {
+    ///
+    /// Create partition builder with epsilon (slack for partition size)
+    ///
     #[must_use]
     pub fn with_epsilon(epsilon: f64) -> Self {
         Self {
@@ -54,30 +62,53 @@ impl PartitionerBuilder {
         }
     }
 
+    ///
+    /// Create partition builder with specific number of threads
+    ///
     #[must_use]
     pub fn threads(mut self, threads: std::num::NonZeroUsize) -> Self {
         self.threads = Some(threads);
         self
     }
 
+    ///
+    /// Fix seed to specific number
+    ///
     #[must_use]
     pub fn seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
     }
 
-    #[must_use]
-    pub fn epsilon(mut self, epsilon: f64) -> Self {
-        self.epsilon = epsilon;
-        self
+    fn create_edges_and_nodes<N, E>(
+        graph: &Graph<N, E, petgraph::Undirected>,
+    ) -> Result<(Vec<u64>, Vec<u32>), KaminParError> {
+        let mut nodes: Vec<u64> = Vec::with_capacity(graph.node_count() + 1);
+        let mut edges: Vec<u32> = Vec::with_capacity(graph.edge_count());
+        nodes.push(0);
+        let mut cum_edge_count = 0;
+        for node in graph.node_indices() {
+            for edge in graph.edges(node) {
+                edges.push(edge.target().index().try_into()?);
+                cum_edge_count += 1;
+            }
+            nodes.push(cum_edge_count);
+        }
+        Ok((nodes, edges))
     }
 
-    #[must_use]
+    ///
+    /// Run partitioning over undirected graph
+    ///
+    /// # Errors
+    ///
+    /// - Will return `Err` if node index can't be converted to u32
+    ///
     pub fn partition<N, E>(
         self,
-        graph: Graph<N, E, petgraph::Undirected>,
+        graph: &Graph<N, E, petgraph::Undirected>,
         num_partitions: u32,
-    ) -> Vec<u32> {
+    ) -> Result<Vec<u32>, KaminParError> {
         let mut partition_builder = ffi::new_partition_builder();
         if let Some(threads) = self.threads {
             partition_builder
@@ -89,34 +120,7 @@ impl PartitionerBuilder {
                 .set_threads(num_partitions as i32);
         }
 
-        let mut nodes: Vec<u64> = Vec::with_capacity(graph.node_count() + 1);
-        let mut edges: Vec<u32> = Vec::with_capacity(graph.edge_count() * 2);
-        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count() * 2);
-        let mut node_weights: Vec<i32> = Vec::with_capacity(graph.node_count());
-
-        nodes.push(0);
-        for node in graph.node_indices() {
-            let mut num_edges_for_node = 0;
-            if let Ok(node_weight) = graph.node_weight(node).unwrap().try_into() {
-                node_weights.push(node_weight);
-            }
-            for edge in graph.edges(node) {
-                edges.push((edge.target().index() as i32).try_into().unwrap());
-                if let Ok(edge_weight) = edge.weight().try_into() {
-                    edge_weights.push(edge_weight);
-                }
-                num_edges_for_node += 1;
-            }
-            nodes.push(num_edges_for_node);
-        }
-
-        if !edge_weights.is_empty() {
-            partition_builder.pin_mut().set_edge_weights(edge_weights);
-        }
-
-        if !node_weights.is_empty() {
-            partition_builder.pin_mut().set_node_weights(node_weights);
-        }
+        let (nodes, edges) = Self::create_edges_and_nodes(graph)?;
 
         partition_builder.pin_mut().set_epsilon(self.epsilon);
         partition_builder.pin_mut().set_seed(self.seed);
@@ -125,6 +129,101 @@ impl PartitionerBuilder {
                 .pin_mut()
                 .partition(nodes, edges, num_partitions);
         let output_assignments: Vec<u32> = output_assignments_cpp.iter().copied().collect();
-        output_assignments
+        Ok(output_assignments)
+    }
+
+    ///
+    /// Run partitioning over edge  weighted undirected graphs
+    ///
+    /// # Errors
+    ///
+    /// - Will return `Err` if node index can't be converted to u32
+    ///
+    pub fn partition_edge_weighted<N, E: Into<i64> + Copy>(
+        self,
+        graph: &Graph<N, E, petgraph::Undirected>,
+        num_partitions: u32,
+    ) -> Result<Vec<u32>, KaminParError> {
+        let mut partition_builder = ffi::new_partition_builder();
+        if let Some(threads) = self.threads {
+            partition_builder
+                .pin_mut()
+                .set_threads(threads.get() as i32);
+        } else {
+            partition_builder
+                .pin_mut()
+                .set_threads(num_partitions as i32);
+        }
+
+        let (nodes, edges) = Self::create_edges_and_nodes(graph)?;
+
+        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count());
+        for node in graph.node_indices() {
+            for edge in graph.edges(node) {
+                edge_weights.push((*edge.weight()).into());
+            }
+        }
+        partition_builder.pin_mut().set_edge_weights(edge_weights);
+        partition_builder.pin_mut().set_epsilon(self.epsilon);
+        partition_builder.pin_mut().set_seed(self.seed);
+        let output_assignments_cpp =
+            partition_builder
+                .pin_mut()
+                .partition(nodes, edges, num_partitions);
+        let output_assignments: Vec<u32> = output_assignments_cpp.iter().copied().collect();
+        Ok(output_assignments)
+    }
+
+    ///
+    /// Run partitioning over edge and node weighted undirected graph
+    ///
+    /// # Errors
+    ///
+    /// - Will return `Err` if not all nodes are weighted
+    /// - Will return `Err` if node index can't be converted to u32
+    ///x
+    pub fn partition_weighted<N: Into<i32> + Copy, E: Into<i64> + Copy>(
+        self,
+        graph: &Graph<N, E, petgraph::Undirected>,
+        num_partitions: u32,
+    ) -> Result<Vec<u32>, KaminParError> {
+        let mut partition_builder = ffi::new_partition_builder();
+        if let Some(threads) = self.threads {
+            partition_builder
+                .pin_mut()
+                .set_threads(threads.get() as i32);
+        } else {
+            partition_builder
+                .pin_mut()
+                .set_threads(num_partitions as i32);
+        }
+
+        let (nodes, edges) = Self::create_edges_and_nodes(graph)?;
+
+        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count());
+        let mut node_weights: Vec<i32> = Vec::with_capacity(graph.node_count());
+
+        for node in graph.node_indices() {
+            node_weights.push(
+                graph
+                    .node_weight(node)
+                    .map(|nw| (*nw).into())
+                    .ok_or(KaminParError::NodeWeightMissing)?,
+            );
+            for edge in graph.edges(node) {
+                edge_weights.push((*edge.weight()).into());
+            }
+        }
+        partition_builder.pin_mut().set_edge_weights(edge_weights);
+        partition_builder.pin_mut().set_node_weights(node_weights);
+
+        partition_builder.pin_mut().set_epsilon(self.epsilon);
+        partition_builder.pin_mut().set_seed(self.seed);
+        let output_assignments_cpp =
+            partition_builder
+                .pin_mut()
+                .partition(nodes, edges, num_partitions);
+        let output_assignments: Vec<u32> = output_assignments_cpp.iter().copied().collect();
+        Ok(output_assignments)
     }
 }

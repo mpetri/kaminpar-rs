@@ -15,6 +15,7 @@ links = "kaminpar"
 libc = { version = "0.2.43", optional = true }
 cxx = "1.0"
 petgraph = "0.6.2"
+thiserror = "1.0.32"
 
 [build-dependencies]
 cmake = "0.1"
