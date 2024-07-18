@@ -53,7 +53,7 @@ The actual C++ code requires:
 - Intel Thread Building Blocks library (TBB)
 - `libnuma-dev` on ubuntu
 
-# Setup commands on Ubuntu
+1. Setup commands on baremetal Ubuntu
 
 - Update GCC version:
 
@@ -72,6 +72,19 @@ gcc --version
 sudo apt-get install libnuma-dev
 sudo apt install libtbb-dev
 ```
+
+2. Setup commands using conda
+
+```bash
+conda create -n <name> python=<version>
+conda install conda-forge::gcc_linux-64"
+conda install conda-forge::gcc -y"
+conda install 'gxx[version=">=14"]'
+conda install conda-forge::tbb-devel
+conda install libnuma numactl
+```
+
+---
 
 # Usage
 
