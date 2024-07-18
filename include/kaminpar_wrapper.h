@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <vector>
+#include <optional>
 #include "rust/cxx.h"
 
 #include "kaminpar/vendor/KaMinPar/library/libkaminpar.h"
