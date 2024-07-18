@@ -53,6 +53,26 @@ The actual C++ code requires:
 - Intel Thread Building Blocks library (TBB)
 - `libnuma-dev` on ubuntu
 
+# Setup commands on Ubuntu
+
+- Update GCC version:
+
+```bash
+sudo apt update
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt install gcc-13 g++-13
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+gcc --version
+```
+
+- Install `libtbb` & `libnuma`:
+
+```bash
+sudo apt-get install libnuma-dev
+sudo apt install libtbb-dev
+```
+
 # Usage
 
 as a library call with a node and edge weighted graph:
