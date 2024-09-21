@@ -33,7 +33,7 @@ void PartitionerBuilder::set_node_weights(rust::Vec<int32_t> node_weights)
 std::unique_ptr<std::vector<uint32_t>> PartitionerBuilder::partition(rust::Vec<uint64_t> nodes, rust::Vec<uint32_t> edges, uint32_t num_partitions)
 {
     kaminpar::shm::Context ctx = kaminpar::shm::create_default_context();
-    kaminpar::KaMinPar partitioner(1, ctx);
+    kaminpar::KaMinPar partitioner(m_threads, ctx);
     partitioner.set_output_level(kaminpar::OutputLevel::QUIET);
 
     if (m_edge_weights.has_value() && m_node_weights.has_value()) {
