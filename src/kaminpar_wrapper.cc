@@ -46,7 +46,7 @@ std::unique_ptr<std::vector<uint32_t>> PartitionerBuilder::partition(rust::Vec<u
       partitioner.borrow_and_mutate_graph(nodes.size() - 1, nodes.data(), edges.data(), nullptr, nullptr);
     }
 
-    std::vector<kaminpar::shm::BlockID> partition(nodes.size());
+    std::vector<kaminpar::shm::BlockID> partition(nodes.size() - 1);
     partitioner.compute_partition(num_partitions, partition.data()); // compute partition
     return std::make_unique<std::vector<uint32_t>>(partition.begin(), partition.end());
 }
