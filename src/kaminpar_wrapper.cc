@@ -20,7 +20,7 @@ void PartitionerBuilder::set_seed(uint64_t seed)
     m_seed = seed;
 }
 
-void PartitionerBuilder::set_edge_weights(rust::Vec<int64_t> edge_weights)
+void PartitionerBuilder::set_edge_weights(rust::Vec<int32_t> edge_weights)
 {
     m_edge_weights = edge_weights;
 }
@@ -32,24 +32,23 @@ void PartitionerBuilder::set_node_weights(rust::Vec<int32_t> node_weights)
 
 std::unique_ptr<std::vector<uint32_t>> PartitionerBuilder::partition(rust::Vec<uint64_t> nodes, rust::Vec<uint32_t> edges, uint32_t num_partitions)
 {
-    auto builder = libkaminpar::PartitionerBuilder::from_adjacency_array(nodes.size() - 1, nodes.data(), edges.data());
-    if (m_edge_weights.has_value())
-    {
-        builder.with_edge_weights(m_edge_weights->data());
+    kaminpar::shm::Context ctx = kaminpar::shm::create_default_context();
+    kaminpar::KaMinPar partitioner(m_threads, ctx);
+    partitioner.set_output_level(kaminpar::OutputLevel::QUIET);
+
+    if (m_edge_weights.has_value() && m_node_weights.has_value()) {
+      partitioner.borrow_and_mutate_graph(nodes.size() - 1, nodes.data(), edges.data(), m_node_weights->data(), m_edge_weights->data());
+    } else if (m_node_weights.has_value()) {
+      partitioner.borrow_and_mutate_graph(nodes.size() - 1, nodes.data(), edges.data(), m_node_weights->data(), nullptr);
+    } else if (m_edge_weights.has_value()) {
+      partitioner.borrow_and_mutate_graph(nodes.size() - 1, nodes.data(), edges.data(), nullptr, m_edge_weights->data());
+    } else {
+      partitioner.borrow_and_mutate_graph(nodes.size() - 1, nodes.data(), edges.data(), nullptr, nullptr);
     }
-    if (m_node_weights.has_value())
-    {
-        builder.with_node_weights(m_node_weights->data());
-    }
 
-    libkaminpar::Partitioner partitioner = builder.create();
-
-    partitioner.set_option("--threads", std::to_string(m_threads));
-    partitioner.set_option("--epsilon", std::to_string(m_epsilon));
-    partitioner.set_option("--seed", std::to_string(m_seed));
-
-    auto partition = partitioner.partition(num_partitions); // compute partition
-    return std::make_unique<std::vector<uint32_t>>(partition.get(), partition.get() + partitioner.partition_size());
+    std::vector<kaminpar::shm::BlockID> partition(nodes.size() - 1);
+    partitioner.compute_partition(num_partitions, partition.data()); // compute partition
+    return std::make_unique<std::vector<uint32_t>>(partition.begin(), partition.end());
 }
 
 std::unique_ptr<PartitionerBuilder> new_partition_builder()

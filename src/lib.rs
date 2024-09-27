@@ -26,7 +26,7 @@ mod ffi {
         fn set_epsilon(self: Pin<&mut PartitionerBuilder>, epsilon: f64);
         fn set_seed(self: Pin<&mut PartitionerBuilder>, seed: u64);
 
-        fn set_edge_weights(self: Pin<&mut PartitionerBuilder>, edge_weights: Vec<i64>);
+        fn set_edge_weights(self: Pin<&mut PartitionerBuilder>, edge_weights: Vec<i32>);
         fn set_node_weights(self: Pin<&mut PartitionerBuilder>, node_weights: Vec<i32>);
         fn partition(
             self: Pin<&mut PartitionerBuilder>,
@@ -139,7 +139,7 @@ impl PartitionerBuilder {
     ///
     /// - Will return `Err` if node index can't be converted to u32
     ///
-    pub fn partition_edge_weighted<N, E: Into<i64> + Copy>(
+    pub fn partition_edge_weighted<N, E: Into<i32> + Copy>(
         self,
         graph: &Graph<N, E, petgraph::Undirected>,
         num_partitions: u32,
@@ -157,7 +157,7 @@ impl PartitionerBuilder {
 
         let (nodes, edges) = Self::create_edges_and_nodes(graph)?;
 
-        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count());
+        let mut edge_weights: Vec<i32> = Vec::with_capacity(graph.edge_count());
         for node in graph.node_indices() {
             for edge in graph.edges(node) {
                 edge_weights.push((*edge.weight()).into());
@@ -182,7 +182,7 @@ impl PartitionerBuilder {
     /// - Will return `Err` if not all nodes are weighted
     /// - Will return `Err` if node index can't be converted to u32
     ///x
-    pub fn partition_weighted<N: Into<i32> + Copy, E: Into<i64> + Copy>(
+    pub fn partition_weighted<N: Into<i32> + Copy, E: Into<i32> + Copy>(
         self,
         graph: &Graph<N, E, petgraph::Undirected>,
         num_partitions: u32,
@@ -200,7 +200,7 @@ impl PartitionerBuilder {
 
         let (nodes, edges) = Self::create_edges_and_nodes(graph)?;
 
-        let mut edge_weights: Vec<i64> = Vec::with_capacity(graph.edge_count());
+        let mut edge_weights: Vec<i32> = Vec::with_capacity(graph.edge_count());
         let mut node_weights: Vec<i32> = Vec::with_capacity(graph.node_count());
 
         for node in graph.node_indices() {

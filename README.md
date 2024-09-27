@@ -53,6 +53,39 @@ The actual C++ code requires:
 - Intel Thread Building Blocks library (TBB)
 - `libnuma-dev` on ubuntu
 
+1. Setup commands on baremetal Ubuntu
+
+- Update GCC version:
+
+```bash
+sudo apt update
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt install gcc-13 g++-13
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+gcc --version
+```
+
+- Install `libtbb` & `libnuma`:
+
+```bash
+sudo apt-get install libnuma-dev
+sudo apt install libtbb-dev
+```
+
+2. Setup commands using conda
+
+```bash
+conda create -n <name> python=<version>
+conda install conda-forge::gcc_linux-64"
+conda install conda-forge::gcc -y"
+conda install 'gxx[version=">=14"]'
+conda install conda-forge::tbb-devel
+conda install libnuma numactl
+```
+
+---
+
 # Usage
 
 as a library call with a node and edge weighted graph:
